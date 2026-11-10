@@ -1,0 +1,135 @@
+
+@page "/admin/categories"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@layout AdminLayout
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject IJSRuntime JS
+
+<PageTitle>الفئات</PageTitle>
+
+<div class="page-head">
+    <h1>الفئات</h1>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert">@error</div>
+}
+
+<div class="split">
+    <section class="panel">
+        @if (cats is null)
+        {
+            <p class="muted">جارٍ التحميل…</p>
+        }
+        else if (cats.Count == 0)
+        {
+            <p class="muted">لا توجد فئات بعد.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>الاسم</th><th>Slug</th><th>المنتجات</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var c in cats)
+                    {
+                        <tr>
+                            <td>@Display(c)</td>
+                            <td class="muted" dir="ltr">@c.Slug</td>
+                            <td>@c.ProductCount</td>
+                            <td class="actions">
+                                <button class="btn btn-sm" @onclick="() => Edit(c)">تعديل</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(c)">حذف</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="panel">
+        <h2>@(edit.Id == 0 ? "فئة جديدة" : "تعديل الفئة")</h2>
+
+        <EditForm Model="edit" OnSubmit="SaveAsync">
+            @foreach (var tr in edit.Translations)
+            {
+                <label>الاسم (@LangName(tr.LanguageCode))
+                    <InputText @bind-Value="tr.Name" dir="@Languages.Dir(tr.LanguageCode)" />
+                </label>
+            }
+
+            <div class="form-row">
+                <label>الترتيب
+                    <InputNumber @bind-Value="edit.SortOrder" />
+                </label>
+                <label>Slug (اختياري)
+                    <InputText @bind-Value="edit.Slug" dir="ltr" />
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">حفظ</button>
+                @if (edit.Id != 0)
+                {
+                    <button type="button" class="btn" @onclick="Reset">فئة جديدة</button>
+                }
+            </div>
+        </EditForm>
+    </section>
+</div>
+
+@code {
+    private List<CategoryEditModel>? cats;
+    private CategoryEditModel edit = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => cats = await Catalog.GetCategoriesForAdminAsync();
+
+    private static string LangName(string code) => Languages.All.First(l => l.Code == code).Name;
+
+    private static string Display(CategoryEditModel c) =>
+        c.Translations.FirstOrDefault(t => t.LanguageCode == "ar" && !string.IsNullOrWhiteSpace(t.Name))?.Name
+        ?? c.Translations.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.Name))?.Name
+        ?? c.Slug ?? "";
+
+    private void Edit(CategoryEditModel c)
+    {
+        error = null;
+        edit = c.Clone();
+    }
+
+    private void Reset()
+    {
+        error = null;
+        edit = new CategoryEditModel();
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null;
+        try
+        {
+            await Catalog.SaveCategoryAsync(edit);
+            edit = new CategoryEditModel();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task DeleteAsync(CategoryEditModel c)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"حذف الفئة «{Display(c)}»؟")) return;
+
+        error = await Catalog.DeleteCategoryAsync(c.Id);
+        if (edit.Id == c.Id) edit = new CategoryEditModel();
+        await LoadAsync();
+    }
+}

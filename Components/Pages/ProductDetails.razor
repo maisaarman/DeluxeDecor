@@ -1,0 +1,75 @@
+@page "/{Lang:length(2)}/products/{Slug}"
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject NavigationManager Nav
+@inject SiteInfo Site
+
+<PageTitle>@(product?.Name ?? T("notFound")) — @Site.Name</PageTitle>
+
+@if (product is null)
+{
+    <div class="container">
+        <p class="empty">@T("notFound")</p>
+        <a class="back" href="@($"/{Lang}")">@T("back")</a>
+    </div>
+}
+else
+{
+    <article class="container product">
+        <a class="back" href="@($"/{Lang}")">@T("back")</a>
+
+        <div class="product-layout">
+            <div class="gallery">
+                @if (product.Images.Count == 0)
+                {
+                    <div class="ph tall" aria-hidden="true"></div>
+                }
+                else
+                {
+                    for (var i = 0; i < product.Images.Count; i++)
+                    {
+                        <img class="@(i == 0 ? "main" : null)" src="@($"/uploads/{product.Images[i]}")" alt="@product.Name" />
+                    }
+                }
+            </div>
+
+            <div class="info">
+                <a class="cat" href="@($"/{Lang}?c={product.CategorySlug}")">@product.CategoryName</a>
+                <h1>@product.Name</h1>
+
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <h2 class="sub">@T("description")</h2>
+                    <p class="desc">@product.Description</p>
+                }
+
+                <button type="button" class="btn btn-primary" data-inquiry data-product-id="@product.Id" data-product-name="@product.Name">@T("ask")</button>
+                <p class="note">@T("madeToOrder")</p>
+            </div>
+        </div>
+    </article>
+}
+
+@code {
+    [Parameter] public string Lang { get; set; } = Languages.Default;
+    [Parameter] public string Slug { get; set; } = "";
+
+    private ProductDetailVm? product;
+
+    private string T(string key) => Ui.Get(Lang, key);
+
+    private string AskUrl => Site.AskLink(Lang, product?.Name ?? "", "/" + Lang);
+
+    private string? AskTarget => Site.WhatsApp.Length > 0 ? "_blank" : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Languages.IsSupported(Lang))
+        {
+            Nav.NavigateTo("/ar", replace: true);
+            return;
+        }
+
+        product = await Catalog.GetProductAsync(Lang, Slug);
+    }
+}

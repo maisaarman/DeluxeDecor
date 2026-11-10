@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+<div class="admin-shell">
+    <aside class="admin-side">
+        <a class="admin-brand" href="/admin">Deluxe Decor</a>
+        <nav class="admin-nav">
+            <a href="/admin">لوحة التحكم</a>
+            <a href="/admin/products">المنتجات</a>
+            <a href="/admin/categories">الفئات</a>
+            <a href="/ar" target="_blank" rel="noopener">عرض الموقع ↗</a>
+            <a href="/admin/inquiries">الرسائل</a>
+        </nav>
+        <form method="post" action="/admin/logout">
+            <button class="btn btn-ghost" type="submit">تسجيل الخروج</button>
+        </form>
+    </aside>
+    <main class="admin-main">
+        @Body
+    </main>
+</div>

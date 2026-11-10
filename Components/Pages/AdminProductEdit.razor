@@ -1,0 +1,233 @@
+@page "/admin/products/new"
+@page "/admin/products/{Id:int}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@layout AdminLayout
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(Id == 0 ? "منتج جديد" : "تعديل منتج")</PageTitle>
+
+@if (notFound)
+{
+    <p class="alert">المنتج غير موجود.</p>
+    <a class="btn" href="/admin/products">العودة للمنتجات</a>
+}
+else if (model is null)
+{
+    <p class="muted">جارٍ التحميل…</p>
+}
+else
+{
+    <div class="page-head">
+        <h1>@(Id == 0 ? "منتج جديد" : "تعديل منتج")</h1>
+    </div>
+
+    @if (categories.Count == 0)
+    {
+        <p class="alert">لازم تضيفي فئة أولًا قبل إضافة منتج.</p>
+    }
+
+    @if (error is not null)
+    {
+        <div class="alert">@error</div>
+    }
+
+    <EditForm Model="model" OnSubmit="SaveAsync">
+        <section class="panel">
+            <h2>بيانات المنتج</h2>
+            <div class="form-row">
+                <label>الفئة
+                    <InputSelect @bind-Value="model.CategoryId">
+                        <option value="0">— اختاري —</option>
+                        @foreach (var c in categories)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+                <label>الترتيب (الأصغر أولًا)
+                    <InputNumber @bind-Value="model.SortOrder" />
+                </label>
+                <label class="check">
+                    <InputCheckbox @bind-Value="model.IsActive" /> ظاهر في الموقع
+                </label>
+            </div>
+            <label>الرابط (Slug) — اختياري، بيتولّد تلقائيًا
+                <InputText @bind-Value="model.Slug" dir="ltr" placeholder="emerald-capsule-mirror" />
+            </label>
+        </section>
+
+        <section class="panel">
+            <h2>الاسم والوصف بكل لغة</h2>
+
+            <div class="tabs">
+                @foreach (var l in Languages.All)
+                {
+                    <button type="button" class="tab @(l.Code == activeLang ? "active" : "")" @onclick="() => activeLang = l.Code">
+                        @l.Name @(Filled(l.Code) ? "✓" : "")
+                    </button>
+                }
+            </div>
+
+            @foreach (var tr in model.Translations)
+            {
+                if (tr.LanguageCode == activeLang)
+                {
+                    <label>الاسم
+                        <InputText @bind-Value="tr.Name" dir="@Languages.Dir(tr.LanguageCode)" />
+                    </label>
+                    <label>الوصف
+                        <InputTextArea @bind-Value="tr.Description" rows="6" dir="@Languages.Dir(tr.LanguageCode)" />
+                    </label>
+                }
+            }
+
+            <p class="hint">إذا تركتي لغة فاضية، الموقع بيعرض النسخة الإنجليزية (أو أول لغة متوفرة).</p>
+        </section>
+
+        <section class="panel">
+            <h2>الصور</h2>
+
+            @if (model.Images.Count > 0)
+            {
+                <div class="thumbs">
+                    @for (var i = 0; i < model.Images.Count; i++)
+                    {
+                        var img = model.Images[i];
+                        <figure>
+                            <img src="@($"/uploads/{img.FileName}")" alt="" />
+                            @if (i == 0) { <span class="badge">الغلاف</span> }
+                            <figcaption>
+                                @if (i != 0)
+                                {
+                                    <button type="button" class="btn btn-sm" @onclick="() => MakeCoverAsync(img)">اجعليها الغلاف</button>
+                                }
+                                <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteImageAsync(img)">حذف</button>
+                            </figcaption>
+                        </figure>
+                    }
+                </div>
+            }
+
+            <label>إضافة صور (JPG / PNG / WebP، حتى 8MB للصورة)
+                <InputFile OnChange="OnFiles" multiple accept=".jpg,.jpeg,.png,.webp" />
+            </label>
+
+            @if (pending.Count > 0)
+            {
+                <ul class="pending">
+                    @foreach (var f in pending)
+                    {
+                        <li>
+                            <span dir="ltr">@f.Name</span> <span class="muted">(@(f.Size / 1024) KB)</span>
+                            <button type="button" class="link" @onclick="() => pending.Remove(f)">إزالة</button>
+                        </li>
+                    }
+                </ul>
+                <p class="hint">رح تنرفع هاي الصور لما تضغطي «حفظ».</p>
+            }
+        </section>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@(saving || categories.Count == 0)">@(saving ? "جارٍ الحفظ…" : "حفظ")</button>
+            <a class="btn" href="/admin/products">إلغاء</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProductEditModel? model;
+    private List<CategoryVm> categories = new();
+    private readonly List<IBrowserFile> pending = new();
+    private string activeLang = Languages.Default;
+    private string? error;
+    private bool saving;
+    private bool notFound;
+    private int? loadedId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedId == Id) return;
+        loadedId = Id;
+
+        notFound = false;
+        error = null;
+        pending.Clear();
+        categories = await Catalog.GetCategoriesAsync("ar");
+
+        if (Id == 0)
+        {
+            model = new ProductEditModel { CategoryId = categories.FirstOrDefault()?.Id ?? 0 };
+        }
+        else
+        {
+            model = await Catalog.GetProductEditModelAsync(Id);
+            notFound = model is null;
+        }
+    }
+
+    private bool Filled(string code) =>
+        model!.Translations.Any(t => t.LanguageCode == code && !string.IsNullOrWhiteSpace(t.Name));
+
+    private void OnFiles(InputFileChangeEventArgs e)
+    {
+        error = null;
+        foreach (var f in e.GetMultipleFiles(20))
+        {
+            var ext = Path.GetExtension(f.Name).ToLowerInvariant();
+            if (!ImageStorage.AllowedExtensions.Contains(ext))
+            {
+                error = $"«{f.Name}»: النوع غير مدعوم (JPG / PNG / WebP فقط).";
+                continue;
+            }
+            if (f.Size > ImageStorage.MaxBytes)
+            {
+                error = $"«{f.Name}»: حجم الصورة أكبر من 8MB.";
+                continue;
+            }
+            pending.Add(f);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null;
+        saving = true;
+        try
+        {
+            await Catalog.SaveProductAsync(model!, pending);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            saving = false;
+            return;
+        }
+        saving = false;
+        Nav.NavigateTo("/admin/products");
+    }
+
+    private async Task MakeCoverAsync(ImageVm img)
+    {
+        await Catalog.SetCoverAsync(model!.Id, img.Id);
+        await ReloadImagesAsync();
+    }
+
+    private async Task DeleteImageAsync(ImageVm img)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "حذف هاي الصورة نهائيًا؟")) return;
+        await Catalog.DeleteImageAsync(img.Id);
+        await ReloadImagesAsync();
+    }
+
+    private async Task ReloadImagesAsync()
+    {
+        var fresh = await Catalog.GetProductEditModelAsync(model!.Id);
+        if (fresh is not null) model.Images = fresh.Images;
+    }
+}

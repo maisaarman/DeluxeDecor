@@ -1,0 +1,72 @@
+@page "/admin/login"
+@layout BareLayout
+@using System.Security.Claims
+@using System.Security.Cryptography
+@using System.Text
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@inject IConfiguration Config
+@inject NavigationManager Nav
+
+<PageTitle>دخول المالك</PageTitle>
+
+<div class="login-wrap">
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginAsync" FormName="admin-login" class="login-card">
+        <h1>دخول المالك</h1>
+
+        @if (error is not null)
+        {
+            <div class="alert">@error</div>
+        }
+
+        <label>اسم المستخدم
+            <InputText @bind-Value="Input.Username" autocomplete="username" dir="ltr" />
+        </label>
+        <label>كلمة المرور
+            <InputText type="password" @bind-Value="Input.Password" autocomplete="current-password" dir="ltr" />
+        </label>
+
+        <button class="btn btn-primary" type="submit">دخول</button>
+    </EditForm>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm] private LoginInput Input { get; set; } = new();
+
+    private string? error;
+
+    private async Task LoginAsync()
+    {
+        var user = Config["Admin:Username"] ?? "";
+        var pass = Config["Admin:Password"] ?? "";
+
+        if (pass.Length > 0 && FixedEq(Input.Username, user) && FixedEq(Input.Password, pass))
+        {
+            var identity = new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.Name, user) },
+                CookieAuthenticationDefaults.AuthenticationScheme);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity),
+                new AuthenticationProperties { IsPersistent = true });
+
+            Nav.NavigateTo("/admin", forceLoad: true);
+            return;
+        }
+
+        await Task.Delay(500); // تبطئة بسيطة ضد تخمين الباسورد
+        error = "اسم المستخدم أو كلمة المرور غير صحيحة.";
+    }
+
+    private static bool FixedEq(string? a, string b) =>
+        CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a ?? ""), Encoding.UTF8.GetBytes(b));
+
+    private sealed class LoginInput
+    {
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

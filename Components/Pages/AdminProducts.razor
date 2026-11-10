@@ -1,0 +1,80 @@
+@page "/admin/products"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@layout AdminLayout
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject IJSRuntime JS
+
+<PageTitle>المنتجات</PageTitle>
+
+<div class="page-head">
+    <h1>المنتجات</h1>
+    <a class="btn btn-primary" href="/admin/products/new">+ منتج جديد</a>
+</div>
+
+@if (rows is null)
+{
+    <p class="muted">جارٍ التحميل…</p>
+}
+else if (rows.Count == 0)
+{
+    <p class="muted">لا توجد منتجات بعد.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th></th><th>الاسم</th><th>الفئة</th><th>الحالة</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td class="thumb-cell">
+                        @if (r.Cover is not null)
+                        {
+                            <img class="thumb" src="@($"/uploads/{r.Cover}")" alt="" />
+                        }
+                        else
+                        {
+                            <div class="thumb ph"></div>
+                        }
+                    </td>
+                    <td>@r.Name</td>
+                    <td class="muted">@r.CategoryName</td>
+                    <td>
+                        <button class="pill @(r.IsActive ? "on" : "off")" @onclick="() => ToggleAsync(r)">
+                            @(r.IsActive ? "ظاهر" : "مخفي")
+                        </button>
+                    </td>
+                    <td class="actions">
+                        <a class="btn btn-sm" href="@($"/admin/products/{r.Id}/edit")">تعديل</a>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(r)">حذف</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProductRowVm>? rows;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => rows = await Catalog.AdminListProductsAsync();
+
+    private async Task ToggleAsync(ProductRowVm r)
+    {
+        await Catalog.SetProductActiveAsync(r.Id, !r.IsActive);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(ProductRowVm r)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"حذف «{r.Name}» نهائيًا؟")) return;
+        await Catalog.DeleteProductAsync(r.Id);
+        await LoadAsync();
+    }
+}

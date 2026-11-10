@@ -1,0 +1,74 @@
+
+@page "/admin/inquiries"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@layout AdminLayout
+@using DeluxeDecor.Data
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject IJSRuntime JS
+
+<PageTitle>الرسائل</PageTitle>
+
+<div class="page-head">
+    <h1>الرسائل @(unread > 0 ? $"({unread} جديدة)" : "")</h1>
+</div>
+
+@if (items is null)
+{
+    <p class="muted">جارٍ التحميل…</p>
+}
+else if (items.Count == 0)
+{
+    <p class="muted">لا توجد رسائل بعد.</p>
+}
+else
+{
+    @foreach (var i in items)
+    {
+        <article class="panel inq-item @(i.IsRead ? "" : "unread")">
+            <header class="inq-head">
+                <strong>@(string.IsNullOrEmpty(i.ProductName) ? "عام" : i.ProductName)</strong>
+                <span class="pill off">@KindLabel(i.Kind)</span>
+                <span class="muted">@i.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+            </header>
+            <p class="inq-body">@i.Message</p>
+            <footer class="inq-foot">
+                <span>@i.Name — <a href="@($"mailto:{i.Email}")" dir="ltr">@i.Email</a></span>
+                <span class="actions">
+                    <button class="btn btn-sm" @onclick="() => ToggleAsync(i)">@(i.IsRead ? "علّميها غير مقروءة" : "علّميها مقروءة")</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(i)">حذف</button>
+                </span>
+            </footer>
+        </article>
+    }
+}
+
+@code {
+    private List<Inquiry>? items;
+    private int unread => items?.Count(x => !x.IsRead) ?? 0;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => items = await Catalog.AdminListInquiriesAsync();
+
+    private static string KindLabel(string k) => k switch
+    {
+        "size" => "المقاس",
+        "custom" => "تخصيص",
+        _ => "عرض سعر"
+    };
+
+    private async Task ToggleAsync(Inquiry i)
+    {
+        await Catalog.SetInquiryReadAsync(i.Id, !i.IsRead);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Inquiry i)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "حذف هاي الرسالة نهائيًا؟")) return;
+        await Catalog.DeleteInquiryAsync(i.Id);
+        await LoadAsync();
+    }
+}

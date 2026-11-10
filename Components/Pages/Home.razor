@@ -1,0 +1,82 @@
+﻿@page "/{Lang:length(2)}"
+@using DeluxeDecor.Services
+@inject CatalogService Catalog
+@inject NavigationManager Nav
+@inject SiteInfo Site
+
+<PageTitle>Deluxe Decor</PageTitle>
+
+<section class="hero">
+    <div class="hero-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="container">
+        <p class="eyebrow">@T("eyebrow")</p>
+        <h1>
+            <span class="rv"><span class="rv-in">@T("heroTitle1")</span></span>
+            <span class="rv d2"><span class="rv-in"><em>@T("heroTitle2")</em></span></span>
+        </h1>
+        <p class="lead">@T("heroSub")</p>
+    </div>
+</section>
+
+<section class="container catalog">
+    <nav class="filters">
+        <a class="chip @(string.IsNullOrEmpty(C) ? "active" : "")" href="@($"/{Lang}")">@T("all")</a>
+        @foreach (var c in categories)
+        {
+            <a class="chip @(C == c.Slug ? "active" : "")" href="@($"/{Lang}?c={c.Slug}")">@c.Name</a>
+        }
+    </nav>
+
+    @if (products.Count == 0)
+    {
+        <p class="empty">@T("noProducts")</p>
+    }
+    else
+    {
+        <div class="grid">
+            @foreach (var p in products)
+            {
+                <article class="card">
+                    <div class="card-img">
+                        @if (p.Cover is not null)
+                        {
+                            <img src="@($"/uploads/{p.Cover}")" alt="@p.Name" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="ph" aria-hidden="true"></div>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <span class="cat">@p.CategoryName</span>
+                       <h3><a href="@($"/{Lang}/products/{p.Slug}")">@p.Name</a></h3>
+                      <button type="button" class="btn" data-inquiry data-product-id="@p.Id" data-product-name="@p.Name">@T("ask")</button>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public string Lang { get; set; } = Languages.Default;
+
+    [SupplyParameterFromQuery(Name = "c")] public string? C { get; set; }
+
+    private List<CategoryVm> categories = new();
+    private List<ProductCardVm> products = new();
+
+    private string T(string key) => Ui.Get(Lang, key);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Languages.IsSupported(Lang))
+        {
+            Nav.NavigateTo("/ar", replace: true);
+            return;
+        }
+
+        categories = await Catalog.GetCategoriesAsync(Lang);
+        products = await Catalog.GetProductsAsync(Lang, C);
+    }
+}

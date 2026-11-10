@@ -1,0 +1,77 @@
+
+@inherits LayoutComponentBase
+@using DeluxeDecor.Services
+@inject NavigationManager Nav
+@inject SiteInfo Site
+
+<header class="site-header">
+    <div class="container header-row">
+        <a class="brand" href="@($"/{Lang}")">Deluxe Decor</a>
+        <nav class="lang-switch" aria-label="Language">
+            @foreach (var l in Languages.All)
+            {
+                <a href="@SwitchUrl(l.Code)" class="@(l.Code == Lang ? "active" : null)" lang="@l.Code" data-enhance-nav="false">@l.Name</a>
+            }
+        </nav>
+    </div>
+</header>
+
+<main>
+    @Body
+</main>
+
+<footer class="site-footer">
+    <div class="container">
+        <p>@Ui.Get(Lang, "madeToOrder")</p>
+        <p class="muted">@Ui.Get(Lang, "location")</p>
+        <a class="owner-link" href="/admin" data-enhance-nav="false">@(Lang == "ar" ? "المالك" : Lang == "fr" ? "Propriétaire" : "Owner")</a>
+    </div>
+</footer>
+<dialog id="inquiry-dialog" class="inquiry" data-wa="@Site.WhatsApp" data-wa-msg="@Ui.Get(Lang, "askMsg")"
+        data-ok="@Ui.Get(Lang, "inqOk")" data-err="@Ui.Get(Lang, "inqErr")">
+    <div class="inq-card">
+        <button type="button" class="inq-close" data-inquiry-close aria-label="Close">×</button>
+        <h2 id="inq-title"></h2>
+        <p class="inq-sub">@Ui.Get(Lang, "inqSub")</p>
+
+        <form id="inq-form" novalidate>
+            <input type="hidden" name="productId" />
+
+            <div class="inq-kinds">
+                <label><input type="radio" name="kind" value="quote" checked /><span>@Ui.Get(Lang, "inqQuote")</span></label>
+                <label><input type="radio" name="kind" value="size" /><span>@Ui.Get(Lang, "inqSize")</span></label>
+                <label><input type="radio" name="kind" value="custom" /><span>@Ui.Get(Lang, "inqCustom")</span></label>
+            </div>
+
+            <label class="inq-field">@Ui.Get(Lang, "inqName")
+                <input name="name" required maxlength="100" autocomplete="name" />
+            </label>
+            <label class="inq-field">@Ui.Get(Lang, "inqEmail")
+                <input name="email" type="email" required maxlength="200" autocomplete="email" dir="ltr" />
+            </label>
+            <label class="inq-field">@Ui.Get(Lang, "inqMessage")
+                <textarea name="message" rows="4" required maxlength="2000"></textarea>
+            </label>
+
+            <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+            <p class="inq-msg" role="status"></p>
+
+            <button class="btn btn-primary inq-send" type="submit">@Ui.Get(Lang, "inqSend")</button>
+            <a id="inq-wa" class="inq-wa" target="_blank" rel="noopener" hidden>@Ui.Get(Lang, "inqWa")</a>
+        </form>
+    </div>
+</dialog>
+@code {
+    private string Lang => Languages.FromPath(new Uri(Nav.Uri).AbsolutePath);
+
+  
+    private string SwitchUrl(string code)
+    {
+        var uri = new Uri(Nav.Uri);
+        var segs = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (segs.Count == 0 || !Languages.IsSupported(segs[0])) segs.Insert(0, code);
+        else segs[0] = code;
+        return "/" + string.Join('/', segs) + uri.Query;
+    }
+}
