@@ -37,6 +37,7 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddSingleton<ImageStorage>();
 builder.Services.AddSingleton<SiteInfo>();
 var app = builder.Build();
+Ui.Load(Path.Combine(app.Environment.ContentRootPath, "Localization"));
 var adminPassword = app.Configuration["Admin:Password"];
 if (string.IsNullOrWhiteSpace(adminPassword) ||
     (!app.Environment.IsDevelopment() && adminPassword.Length < 10))
