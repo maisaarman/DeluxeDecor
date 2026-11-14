@@ -28,8 +28,16 @@ else
                 {
                     for (var i = 0; i < product.Images.Count; i++)
                     {
-                        <img class="@(i == 0 ? "main" : null)" src="@($"/uploads/{product.Images[i]}")" alt="@product.Name" />
-                    }
+                      var file = product.Images[i];
+                    if (ImageStorage.IsVideo(file))
+                {
+                <video class="@(i == 0 ? "main" : null)" src="@($"/uploads/{file}")" controls preload="metadata" playsinline></video>
+                }
+                    else
+                {
+                 <img class="@(i == 0 ? "main" : null)" src="@($"/uploads/{file}")" alt="@product.Name" />
+               }
+               }
                 }
             </div>
 

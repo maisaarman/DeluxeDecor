@@ -33,6 +33,7 @@ public class Product
 
     public List<ProductTranslation> Translations { get; set; } = new();
     public List<ProductImage> Images { get; set; } = new();
+    public string? ThumbnailFileName { get; set; }
 }
 
 public class ProductTranslation
@@ -52,8 +53,8 @@ public class ProductImage
     public int ProductId { get; set; }
     public Product? Product { get; set; }
 
-    public string FileName { get; set; } = "";   // اسم الملف فقط، والصورة نفسها على القرص
-    public int SortOrder { get; set; }           // أول صورة = الغلاف
+    public string FileName { get; set; } = "";   
+    public int SortOrder { get; set; }           
 }
 
 public class Inquiry

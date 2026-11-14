@@ -89,7 +89,29 @@ else
         </section>
 
         <section class="panel">
-            <h2>الصور</h2>
+            <h2>الصورة المصغّرة (تظهر على كرت المنتج)</h2>
+
+            @if (thumbFile is not null)
+            {
+                <p>رح تنرفع: <span dir="ltr">@thumbFile.Name</span>
+                    <button type="button" class="link" @onclick="() => thumbFile = null">إزالة</button></p>
+            }
+            else if (model.ThumbnailFileName is not null)
+            {
+                <div class="thumb-row">
+                    <img class="thumb-big" src="@($"/uploads/{model.ThumbnailFileName}")" alt="" />
+                    <button type="button" class="btn btn-sm btn-danger" @onclick="ClearThumbAsync">حذف المصغّرة</button>
+                </div>
+            }
+
+            <label>اختاري صورة مصغّرة (JPG / PNG / WebP، حتى 8MB)
+                <InputFile OnChange="OnThumb" accept=".jpg,.jpeg,.png,.webp" />
+            </label>
+            <p class="hint">إذا ما رفعتي مصغّرة، الكرت بيستخدم أول صورة من صور التفاصيل.</p>
+        </section>
+
+        <section class="panel">
+            <h2>صور وفيديو صفحة التفاصيل (حجم أكبر)</h2>
 
             @if (model.Images.Count > 0)
             {
@@ -98,13 +120,23 @@ else
                     {
                         var img = model.Images[i];
                         <figure>
-                            <img src="@($"/uploads/{img.FileName}")" alt="" />
-                            @if (i == 0) { <span class="badge">الغلاف</span> }
+                            @if (ImageStorage.IsVideo(img.FileName))
+                            {
+                                <video src="@($"/uploads/{img.FileName}")" muted preload="metadata"></video>
+                            }
+                            else
+                            {
+                                <img src="@($"/uploads/{img.FileName}")" alt="" />
+                            }
+                            @if (i == 0) { <span class="badge">الرئيسية</span> }
                             <figcaption>
                                 @if (i != 0)
                                 {
-                                    <button type="button" class="btn btn-sm" @onclick="() => MakeCoverAsync(img)">اجعليها الغلاف</button>
+                                    <button type="button" class="btn btn-sm" @onclick="() => MakeCoverAsync(img)">اجعليها الرئيسية</button>
                                 }
+                                <label class="btn btn-sm replace-btn">استبدال
+                               <InputFile OnChange="e => ReplaceAsync(img, e)" accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" />
+                                  </label> 
                                 <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteImageAsync(img)">حذف</button>
                             </figcaption>
                         </figure>
@@ -112,8 +144,8 @@ else
                 </div>
             }
 
-            <label>إضافة صور (JPG / PNG / WebP، حتى 8MB للصورة)
-                <InputFile OnChange="OnFiles" multiple accept=".jpg,.jpeg,.png,.webp" />
+            <label>إضافة ملفات (صور JPG / PNG / WebP حتى 8MB، أو فيديو MP4 / WebM حتى 50MB)
+                <InputFile OnChange="OnFiles" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" />
             </label>
 
             @if (pending.Count > 0)
@@ -127,8 +159,9 @@ else
                         </li>
                     }
                 </ul>
-                <p class="hint">رح تنرفع هاي الصور لما تضغطي «حفظ».</p>
+                <p class="hint">رح تنرفع هاي الملفات لما تضغطي «حفظ». الفيديو الكبير ممكن ياخد وقت.</p>
             }
+            <p class="hint">أول ملف هو اللي بيظهر كبير بأول صفحة المنتج.</p>
         </section>
 
         <div class="form-actions">
@@ -144,6 +177,7 @@ else
     private ProductEditModel? model;
     private List<CategoryVm> categories = new();
     private readonly List<IBrowserFile> pending = new();
+    private IBrowserFile? thumbFile;
     private string activeLang = Languages.Default;
     private string? error;
     private bool saving;
@@ -158,6 +192,7 @@ else
         notFound = false;
         error = null;
         pending.Clear();
+        thumbFile = null;
         categories = await Catalog.GetCategoriesAsync("ar");
 
         if (Id == 0)
@@ -174,6 +209,24 @@ else
     private bool Filled(string code) =>
         model!.Translations.Any(t => t.LanguageCode == code && !string.IsNullOrWhiteSpace(t.Name));
 
+    private void OnThumb(InputFileChangeEventArgs e)
+    {
+        error = null;
+        var f = e.File;
+        var ext = Path.GetExtension(f.Name).ToLowerInvariant();
+        if (!ImageStorage.ImageExtensions.Contains(ext))
+        {
+            error = $"«{f.Name}»: الصورة المصغّرة لازم تكون JPG أو PNG أو WebP.";
+            return;
+        }
+        if (f.Size > ImageStorage.MaxImageBytes)
+        {
+            error = $"«{f.Name}»: حجم الصورة أكبر من 8MB.";
+            return;
+        }
+        thumbFile = f;
+    }
+
     private void OnFiles(InputFileChangeEventArgs e)
     {
         error = null;
@@ -182,12 +235,14 @@ else
             var ext = Path.GetExtension(f.Name).ToLowerInvariant();
             if (!ImageStorage.AllowedExtensions.Contains(ext))
             {
-                error = $"«{f.Name}»: النوع غير مدعوم (JPG / PNG / WebP فقط).";
+                error = $"«{f.Name}»: النوع غير مدعوم (صور JPG / PNG / WebP أو فيديو MP4 / WebM).";
                 continue;
             }
-            if (f.Size > ImageStorage.MaxBytes)
+            if (f.Size > ImageStorage.LimitFor(f.Name))
             {
-                error = $"«{f.Name}»: حجم الصورة أكبر من 8MB.";
+                error = ImageStorage.IsVideo(f.Name)
+                    ? $"«{f.Name}»: حجم الفيديو أكبر من 50MB."
+                    : $"«{f.Name}»: حجم الصورة أكبر من 8MB.";
                 continue;
             }
             pending.Add(f);
@@ -200,7 +255,7 @@ else
         saving = true;
         try
         {
-            await Catalog.SaveProductAsync(model!, pending);
+            await Catalog.SaveProductAsync(model!, pending, thumbFile);
         }
         catch (Exception ex)
         {
@@ -212,6 +267,13 @@ else
         Nav.NavigateTo("/admin/products");
     }
 
+    private async Task ClearThumbAsync()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "حذف الصورة المصغّرة؟")) return;
+        await Catalog.ClearThumbnailAsync(model!.Id);
+        model.ThumbnailFileName = null;
+    }
+
     private async Task MakeCoverAsync(ImageVm img)
     {
         await Catalog.SetCoverAsync(model!.Id, img.Id);
@@ -220,7 +282,7 @@ else
 
     private async Task DeleteImageAsync(ImageVm img)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "حذف هاي الصورة نهائيًا؟")) return;
+        if (!await JS.InvokeAsync<bool>("confirm", "حذف هاد الملف نهائيًا؟")) return;
         await Catalog.DeleteImageAsync(img.Id);
         await ReloadImagesAsync();
     }
@@ -230,4 +292,34 @@ else
         var fresh = await Catalog.GetProductEditModelAsync(model!.Id);
         if (fresh is not null) model.Images = fresh.Images;
     }
+
+private async Task ReplaceAsync(ImageVm img, InputFileChangeEventArgs e)
+{
+    error = null;
+    var f = e.File;
+    var ext = Path.GetExtension(f.Name).ToLowerInvariant();
+
+    if (!ImageStorage.AllowedExtensions.Contains(ext))
+    {
+        error = $"«{f.Name}»: النوع غير مدعوم.";
+        return;
+    }
+    if (f.Size > ImageStorage.LimitFor(f.Name))
+    {
+        error = $"«{f.Name}»: الحجم أكبر من المسموح.";
+        return;
+    }
+
+    try
+    {
+        await Catalog.ReplaceImageAsync(img.Id, f);
+        await ReloadImagesAsync();
+    }
+    catch (Exception ex)
+    {
+        error = ex.Message;
+    }
+}
+
+
 }

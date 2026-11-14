@@ -23,7 +23,16 @@ public static class DbSeeder
         ""IsRead"" INTEGER NOT NULL
 );");
        
-        if (await db.Categories.AnyAsync()) return;  // إذا في بيانات، لا نعيد التعبئة
+
+var productCols = await db.Database
+    .SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('Products')")
+    .ToListAsync();
+if (!productCols.Contains("ThumbnailFileName"))
+    await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Products\" ADD COLUMN \"ThumbnailFileName\" TEXT NULL");
+
+
+
+        if (await db.Categories.AnyAsync()) return;  
 
         var mirrors = Cat("mirrors", 1, "مرايا", "Mirrors", "Miroirs");
         var wall = Cat("wall-decor", 2, "ديكور جداري", "Wall Decor", "Décoration murale");

@@ -18,4 +18,5 @@ public class ProductEditModel
     public List<ImageVm> Images { get; set; } = new();
     public List<TranslationEdit> Translations { get; set; } =
         Languages.All.Select(l => new TranslationEdit { LanguageCode = l.Code }).ToList();
+        public string? ThumbnailFileName { get; set; }
 }

@@ -37,22 +37,30 @@
             @foreach (var p in products)
             {
                 <article class="card">
-                    <div class="card-img">
-                        @if (p.Cover is not null)
-                        {
-                            <img src="@($"/uploads/{p.Cover}")" alt="@p.Name" loading="lazy" />
-                        }
-                        else
-                        {
-                            <div class="ph" aria-hidden="true"></div>
-                        }
-                    </div>
-                    <div class="card-body">
-                        <span class="cat">@p.CategoryName</span>
-                       <h3><a href="@($"/{Lang}/products/{p.Slug}")">@p.Name</a></h3>
-                      <button type="button" class="btn" data-inquiry data-product-id="@p.Id" data-product-name="@p.Name">@T("ask")</button>
-                    </div>
-                </article>
+    <a class="card-img" href="@($"/{Lang}/products/{p.Slug}")">
+        @if (p.Cover is not null)
+        {
+            <img src="@($"/uploads/{p.Cover}")" alt="@p.Name" loading="lazy" />
+        }
+        else
+        {
+            <div class="ph" aria-hidden="true"></div>
+        }
+    </a>
+
+    <div class="card-body">
+        <span class="cat">@p.CategoryName</span>
+        <h3>
+            <a href="@($"/{Lang}/products/{p.Slug}")">@p.Name</a>
+        </h3>
+        <button type="button" class="btn"
+                data-inquiry
+                data-product-id="@p.Id"
+                data-product-name="@p.Name">
+            @T("ask")
+        </button>
+    </div>
+</article>
             }
         </div>
     }
